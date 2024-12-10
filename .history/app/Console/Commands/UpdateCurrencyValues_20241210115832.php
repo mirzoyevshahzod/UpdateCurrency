@@ -25,17 +25,9 @@ class UpdateCurrencyValues extends Command
                 $this->info("$name: $value");
             }
 
-            // Scrape USD, EUR, RUB, and date from Website 2 (CBU)
-            $this->info('Fetching USD, EUR, RUB, and date from Website 2 (CBU)...');
+            // Scrape USD, EUR, and RUB from Website 2 (CBU)
+            $this->info('Fetching USD, EUR, and RUB from Website 2 (CBU)...');
             $valuesFromSite2 = $this->scrapeFromCBU();
-
-            if (!isset($valuesFromSite2['date'])) {
-                $this->error('Date not found in the CBU JSON response.');
-                return;
-            }
-
-            $scrapedDate = $valuesFromSite2['date']; // Extract the scraped date
-            unset($valuesFromSite2['date']); // Remove the date from currency values
 
             foreach ($valuesFromSite2 as $name => $value) {
                 $this->info("$name: $value");
@@ -44,21 +36,21 @@ class UpdateCurrencyValues extends Command
             // Combine results from both websites
             $this->info('Updating values in the database...');
             $allCurrencies = [
-                ['name' => 'USD', 'value' => $valuesFromSite1['USD'] ?? null, 'date' => now()->toDateString()],
-                ['name' => 'RUB', 'value' => $valuesFromSite1['RUB'] ?? null, 'date' => now()->toDateString()],
-                ['name' => 'EUR', 'value' => $valuesFromSite1['EUR'] ?? null, 'date' => now()->toDateString()],
-                ['name' => 'CBU-USD', 'value' => $valuesFromSite2['USD'] ?? null, 'date' => $scrapedDate],
-                ['name' => 'CBU-RUB', 'value' => $valuesFromSite2['RUB'] ?? null, 'date' => $scrapedDate],
-                ['name' => 'CBU-EUR', 'value' => $valuesFromSite2['EUR'] ?? null, 'date' => $scrapedDate],
+                ['name' => 'USD', 'value' => $valuesFromSite1['USD'] ?? null],
+                ['name' => 'RUB', 'value' => $valuesFromSite1['RUB'] ?? null],
+                ['name' => 'EUR', 'value' => $valuesFromSite1['EUR'] ?? null],
+                ['name' => 'CBU-USD', 'value' => $valuesFromSite2['USD'] ?? null],
+                ['name' => 'CBU-RUB', 'value' => $valuesFromSite2['RUB'] ?? null],
+                ['name' => 'CBU-EUR', 'value' => $valuesFromSite2['EUR'] ?? null],
             ];
 
             // Add or update rows in the database
             foreach ($allCurrencies as $currency) {
                 if ($currency['value'] !== null) {
                     Currency::updateOrCreate(
-                        ['date' => $currency['date'], 'name' => $currency['name']], // Match on date and name
+                        ['date' => now()->toDateString(), 'name' => $currency['name']], // Match on date and name
                         ['value' => $currency['value'], 'updated_at' => now()] // Update or insert value
-                    );
+                    )->touch();
                 }
             }
 
@@ -109,18 +101,13 @@ class UpdateCurrencyValues extends Command
                 return [];
             }
 
-            // Extract USD, EUR, RUB, and date
+            // Extract USD, EUR, and RUB
             $currencies = [];
             foreach ($data as $currency) {
                 if (in_array($currency['Ccy'], ['USD', 'EUR', 'RUB'])) {
                     $currencies[$currency['Ccy']] = $currency['Rate'];
                 }
             }
-
-            // Add the date field from the first entry (common for all records in the JSON)
-            $rawDate = $data[0]['Date']; // e.g., "10.12.2024"
-            $formattedDate = \Carbon\Carbon::createFromFormat('d.m.Y', $rawDate)->format('Y-m-d');
-            $currencies['date'] = $formattedDate;
 
             return $currencies;
         } catch (\Exception $e) {

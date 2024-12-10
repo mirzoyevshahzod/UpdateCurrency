@@ -118,9 +118,7 @@ class UpdateCurrencyValues extends Command
             }
 
             // Add the date field from the first entry (common for all records in the JSON)
-            $rawDate = $data[0]['Date']; // e.g., "10.12.2024"
-            $formattedDate = \Carbon\Carbon::createFromFormat('d.m.Y', $rawDate)->format('Y-m-d');
-            $currencies['date'] = $formattedDate;
+            $currencies['date'] = $data[0]['Date'];
 
             return $currencies;
         } catch (\Exception $e) {
